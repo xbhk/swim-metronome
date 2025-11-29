@@ -1,89 +1,50 @@
-# Swim Metronome Configuration
+# ============================================================
+# 运动节拍器配置文件
+# Workout Pacer Configuration
+# ============================================================
 
-# Pool settings
-pool:
-  length: 25  # Pool length (meters)
-  actual_length: 23  # Actual length (if different from standard)
+# ===== 配速设置 =====
+# 你的目标配速是多少？
+# 例：2分钟跑100米 → target_time: "2:00", per_meters: 100
+# 例：6分钟跑1公里 → target_time: "6:00", per_meters: 1000
+target_time: "2:00"
+per_meters: 100
 
-# Target configuration
-target:
-  # Pace setting
-  pace: "2:45"  # 2min 45sec per 100m - aerobic pace (~27min 30sec for 1000m)
-  # time_per_100m: 165  # Or use seconds directly
+# ===== 音频设置 =====
+# 这段音频能陪你跑多远？
+total_distance: 1000     # 米
 
-  # Target distance (meters) - audio duration calculated automatically
-  distance: 2000
+# 每跑多少米报一次时？
+# 填 25 → 会在 25m, 50m, 75m, 100m... 处报时
+# 游泳建议填泳池长度（25或50），每到池边报一次
+announce_every: 25
 
-# Audio output settings
-audio:
-  # Warmup phase
-  warmup_time: 60  # Warmup time (seconds)
-  warmup_announcements:
-    - time: 60
-      text: "Ready in 1 minute"
-    - time: 30
-      text: "30 seconds"
-    - time: 10
-      text: "10"
-    - time: 9
-      text: "9"
-    - time: 8
-      text: "8"
-    - time: 7
-      text: "7"
-    - time: 6
-      text: "6"
-    - time: 5
-      text: "5"
-    - time: 4
-      text: "4"
-    - time: 3
-      text: "3"
-    - time: 2
-      text: "2"
-    - time: 1
-      text: "1"
-    - time: 0
-      text: "Go!"
+# ===== 可选设置（有默认值，可以不改）=====
 
-  buffer_time: 60  # Buffer time after swimming (seconds)
-  format: "mp3"
-  sample_rate: 44100
-  output_filename: "swim_metronome.mp3"
+# 准备倒计时
+warmup_seconds: 15       # 开始前的倒计时秒数（建议15秒，包含提示+10秒倒数）
 
-# Metronome settings
+# 节拍器（帮助保持划水/步频节奏，默认启用）
 metronome:
-  enabled: true
-  bpm: 36  # Beats per minute
-  beats_per_measure: 6
-  accent_first: true
-  volume: 1.0
-  click_frequency: 800  # Normal beat frequency (Hz)
-  accent_frequency: 1200  # Accent beat frequency (Hz)
-  click_duration: 0.05
+  enabled: true         # 是否启用节拍器（true/false）
+  bpm: 50                # 每分钟节拍数（根据你的划水/步频调整）
 
-# Voice settings
+# 语音设置
 voice:
-  enabled: true
-  volume: 1.0
+  language: "zh"         # 语言："zh" 中文 / "en" 英文
 
-  # TTS Provider: "edge" (free, recommended) or "openai" (premium, paid)
-  tts_provider: "edge"
+# ===== 高级设置（一般不需要改）=====
 
-  # Edge TTS settings (default, free, works in China)
+# 语音引擎
+tts:
+  provider: "edge"       # "edge"（免费，推荐）或 "openai"（付费，音质更好）
   edge:
-    voice_en: "en-US-AriaNeural"  # English voice
-    voice_zh: "zh-CN-XiaozhenNeural"  # Chinese voice
-    rate: "+0%"  # Speech rate
-
-  # OpenAI TTS settings (optional, requires API key)
+    voice_zh: "zh-CN-XiaozhenNeural"   # 中文语音
+    voice_en: "en-US-AriaNeural"       # 英文语音
   openai:
-    voice_model: "nova"  # alloy, echo, fable, onyx, nova, shimmer
-    tts_model: "tts-1"  # tts-1 or tts-1-hd
-    api_key: ""  # Your OpenAI API key (or set OPENAI_API_KEY env var)
-    base_url: ""  # Custom API base URL (optional)
+    api_key: ""          # OpenAI API Key（使用 openai 时需要填写）
+    base_url: ""         # API 地址（可选）
 
-  # Distance announcement settings
-  announcements:
-    - interval: 25
-      format: "{distance} meters"
+# 输出文件
+output:
+  filename: "workout_pacer.mp3"

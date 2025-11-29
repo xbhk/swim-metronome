@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Swim Metronome Generator
-Generate metronome audio with voice announcements based on config
+Workout Pacer Generator
+Generate audio with voice announcements to help maintain steady pace
 """
 
 import yaml
@@ -12,315 +12,328 @@ from tts_service import get_tts_service
 from audio_generator import AudioGenerator
 
 
+# Internal defaults (hidden from user config)
+DEFAULTS = {
+    'warmup_seconds': 15,
+    'metronome_enabled': False,
+    'metronome_bpm': 55,
+    'click_frequency': 800,
+    'accent_frequency': 1200,
+    'click_duration': 0.05,
+    'beats_per_measure': 4,
+    'sample_rate': 44100,
+    'format': 'mp3',
+    'voice_volume': 1.0,
+    'output_filename': 'workout_pacer.mp3',
+}
+
+
 def load_config(config_path="config.yaml"):
     """Load configuration file"""
     with open(config_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
 
-def parse_pace(pace_str):
+def parse_time(time_str):
     """
-    Parse pace string, supports "1:45" format
+    Parse time string like "2:00" to seconds
 
     Args:
-        pace_str: Pace string like "1:45" or "2:30"
+        time_str: Time string like "2:00" or "1:45"
 
     Returns:
-        int: Seconds
+        int: Total seconds
     """
-    if ':' in str(pace_str):
-        parts = str(pace_str).split(':')
+    if ':' in str(time_str):
+        parts = str(time_str).split(':')
         minutes = int(parts[0])
         seconds = int(parts[1])
         return minutes * 60 + seconds
     else:
-        return int(pace_str)
+        return int(time_str)
 
 
 def process_config(config):
     """
-    Process config, calculate actual parameters
+    Process and validate config, apply defaults
 
-    - Parse pace format
-    - Calculate duration from distance
-    - Add warmup_time to total duration
+    Required fields:
+        - target_time: "2:00" (time to cover per_meters)
+        - per_meters: 100 (reference distance)
+        - total_distance: 1000 (total workout distance)
+        - announce_every: 25 (announcement interval)
     """
-    # 1. Parse pace
-    if 'pace' in config['target']:
-        time_per_100m = parse_pace(config['target']['pace'])
-        config['target']['time_per_100m'] = time_per_100m
-    elif 'time_per_100m' not in config['target']:
-        raise ValueError("Must set target.pace or target.time_per_100m")
+    # Validate required fields
+    required = ['target_time', 'per_meters', 'total_distance', 'announce_every']
+    for field in required:
+        if field not in config:
+            raise ValueError(f"Missing required field: {field}")
 
-    # 2. Calculate audio duration (without warmup)
-    if 'distance' in config['target']:
-        distance = config['target']['distance']
-        time_per_100m = config['target']['time_per_100m']
-        buffer_time = config['audio'].get('buffer_time', 60)
+    # Parse target_time to seconds
+    config['target_time_seconds'] = parse_time(config['target_time'])
 
-        swim_time = (distance / 100) * time_per_100m
-        swim_duration = int(swim_time + buffer_time)
+    # Calculate speed (seconds per meter)
+    config['seconds_per_meter'] = config['target_time_seconds'] / config['per_meters']
 
-        config['audio']['swim_duration'] = swim_duration
-    elif 'duration' not in config['audio']:
-        raise ValueError("Must set target.distance or audio.duration")
-    else:
-        config['audio']['swim_duration'] = config['audio']['duration']
+    # Calculate total workout duration
+    workout_duration = config['total_distance'] * config['seconds_per_meter']
+    config['workout_duration'] = int(workout_duration)
 
-    # 3. Add warmup time to total duration
-    warmup_time = config['audio'].get('warmup_time', 0)
-    config['audio']['duration'] = config['audio']['swim_duration'] + warmup_time
+    # Apply defaults for optional fields
+    config['warmup_seconds'] = config.get('warmup_seconds', DEFAULTS['warmup_seconds'])
+
+    # Metronome defaults
+    metronome = config.get('metronome', {})
+    config['metronome'] = {
+        'enabled': metronome.get('enabled', DEFAULTS['metronome_enabled']),
+        'bpm': metronome.get('bpm', DEFAULTS['metronome_bpm']),
+        'click_frequency': DEFAULTS['click_frequency'],
+        'accent_frequency': DEFAULTS['accent_frequency'],
+        'click_duration': DEFAULTS['click_duration'],
+        'beats_per_measure': DEFAULTS['beats_per_measure'],
+        'volume': 1.0,
+    }
+
+    # Voice defaults
+    voice = config.get('voice', {})
+    config['voice'] = {
+        'language': voice.get('language', 'en'),
+        'volume': DEFAULTS['voice_volume'],
+    }
+
+    # TTS defaults
+    tts = config.get('tts', {})
+    config['tts'] = {
+        'provider': tts.get('provider', 'edge'),
+        'edge': tts.get('edge', {
+            'voice_zh': 'zh-CN-XiaoyuMultilingualNeural',
+            'voice_en': 'en-US-AriaNeural',
+        }),
+        'openai': tts.get('openai', {}),
+    }
+
+    # Output defaults
+    output = config.get('output', {})
+    config['output'] = {
+        'filename': output.get('filename', DEFAULTS['output_filename']),
+        'format': DEFAULTS['format'],
+        'sample_rate': DEFAULTS['sample_rate'],
+    }
+
+    # Total duration including warmup
+    config['total_duration'] = config['warmup_seconds'] + config['workout_duration']
 
     return config
 
 
 def get_tts_from_config(config):
-    """
-    Create TTS service based on config
-
-    Args:
-        config: Configuration dict
-
-    Returns:
-        TTS service instance
-    """
-    voice_config = config['voice']
-    provider = voice_config.get('tts_provider', 'edge')
+    """Create TTS service based on config"""
+    tts_config = config['tts']
+    provider = tts_config.get('provider', 'edge')
+    language = config['voice'].get('language', 'en')
 
     if provider == 'edge':
-        edge_config = voice_config.get('edge', {})
-        return get_tts_service(
-            provider='edge',
-            voice=edge_config.get('voice_en'),  # Will auto-detect language
-            rate=edge_config.get('rate', '+0%')
-        )
+        edge_config = tts_config.get('edge', {})
+        voice = edge_config.get('voice_zh') if language == 'zh' else edge_config.get('voice_en')
+        return get_tts_service(provider='edge', voice=voice)
     elif provider == 'openai':
-        openai_config = voice_config.get('openai', {})
+        openai_config = tts_config.get('openai', {})
         return get_tts_service(
             provider='openai',
             api_key=openai_config.get('api_key') or None,
             base_url=openai_config.get('base_url') or None,
-            voice=openai_config.get('voice_model', 'nova'),
-            model=openai_config.get('tts_model', 'tts-1')
         )
     else:
         raise ValueError(f"Unknown TTS provider: {provider}")
 
 
-def main():
-    """Main program"""
-    print("=" * 60)
-    print("Swim Metronome Generator")
-    print("=" * 60)
+def calculate_announcements(config):
+    """
+    Calculate all announcement times and texts
 
-    # 1. Load config
-    print("\n[1/7] Loading configuration...")
-    config = load_config()
-    config = process_config(config)
-
-    time_per_100m = config['target']['time_per_100m']
-    duration = config['audio']['duration']
-    swim_duration = config['audio']['swim_duration']
-    warmup_time = config['audio'].get('warmup_time', 0)
-
-    print(f"  ✓ Configuration loaded")
-    print(f"    - Pool length: {config['pool']['length']}m")
-    print(f"    - Target pace: {time_per_100m}sec/100m "
-          f"({time_per_100m//60}min {time_per_100m%60}sec)")
-
-    if 'distance' in config['target']:
-        distance = config['target']['distance']
-        swim_time = (distance / 100) * time_per_100m
-        print(f"    - Target distance: {distance}m")
-        print(f"    - Estimated swim time: {int(swim_time//60)}min {int(swim_time%60)}sec")
-
-    if warmup_time > 0:
-        print(f"    - Warmup time: {warmup_time}sec")
-        print(f"    - Swim audio duration: {swim_duration}sec ({swim_duration//60}min {swim_duration%60}sec)")
-        print(f"    - Total duration: {duration}sec ({duration//60}min {duration%60}sec)")
-    else:
-        print(f"    - Total duration: {duration}sec ({duration//60}min {duration%60}sec)")
-
-    # 2. Initialize audio generator
-    print("\n[2/7] Initializing audio generator...")
-    audio_gen = AudioGenerator(sample_rate=config['audio']['sample_rate'])
-    print("  ✓ Audio generator initialized")
-
-    # 3. Generate metronome (if enabled)
-    base_audio = None
-    if config['metronome']['enabled']:
-        print("\n[3/7] Generating metronome...")
-        print(f"    - BPM: {config['metronome']['bpm']}")
-        print(f"    - Beats per measure: {config['metronome']['beats_per_measure']}")
-        print(f"    - Volume: {config['metronome']['volume']}")
-
-        # Generate warmup phase metronome
-        print(f"    - Generating warmup phase ({warmup_time}sec)")
-        warmup_metronome = audio_gen.generate_metronome(
-            bpm=config['metronome']['bpm'],
-            beats_per_measure=config['metronome']['beats_per_measure'],
-            duration_seconds=warmup_time,
-            click_frequency=config['metronome']['click_frequency'],
-            accent_frequency=config['metronome']['accent_frequency'],
-            click_duration=config['metronome']['click_duration'],
-            volume=config['metronome']['volume'],
-            accent_first=config['metronome']['accent_first']
-        )
-
-        # Generate swim phase metronome
-        print(f"    - Generating swim phase ({swim_duration}sec)")
-        swim_metronome = audio_gen.generate_metronome(
-            bpm=config['metronome']['bpm'],
-            beats_per_measure=config['metronome']['beats_per_measure'],
-            duration_seconds=swim_duration,
-            click_frequency=config['metronome']['click_frequency'],
-            accent_frequency=config['metronome']['accent_frequency'],
-            click_duration=config['metronome']['click_duration'],
-            volume=config['metronome']['volume'],
-            accent_first=config['metronome']['accent_first']
-        )
-
-        # Concatenate warmup and swim phase
-        base_audio = warmup_metronome + swim_metronome
-        print("  ✓ Metronome generated (warmup + swim)")
-    else:
-        print("\n[3/7] Metronome disabled, using silent track...")
-        base_audio = AudioSegment.silent(duration=config['audio']['duration'] * 1000)
-        print("  ✓ Silent track created")
-
-    # 4. Calculate voice announcement times
-    print("\n[4/7] Calculating voice announcement times...")
+    Returns:
+        list: [(time_seconds, text), ...]
+    """
     announcements = []
     all_texts = set()
+    language = config['voice'].get('language', 'en')
+    warmup = config['warmup_seconds']
 
-    # 4.1 Add warmup announcements
-    if warmup_time > 0 and 'warmup_announcements' in config['audio']:
-        print(f"  Warmup announcements:")
-        for warmup_ann in config['audio']['warmup_announcements']:
-            actual_time = warmup_time - warmup_ann['time']
-            text = warmup_ann['text']
+    # 1. Warmup phase announcements
+    if warmup > 0:
+        # Introduction at the very beginning
+        if language == 'zh':
+            intro_text = "现在是准备阶段，请做好准备"
+        else:
+            intro_text = "Get ready, workout starting soon"
+        announcements.append({'time': 0, 'text': intro_text})
+        all_texts.add(intro_text)
+
+        # Full countdown: 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
+        # Countdown ends at warmup time, so starts at (warmup - 10)
+        countdown_duration = min(10, warmup - 3)  # Leave 3 sec for intro
+        
+        for i in range(countdown_duration, 0, -1):
+            actual_time = warmup - i
+            text = str(i)
+            announcements.append({'time': actual_time, 'text': text})
             all_texts.add(text)
+
+        # "Go!" at warmup end - more encouraging
+        if language == 'zh':
+            go_text = "开始！保持节奏，加油！"
+        else:
+            go_text = "Go! Keep the pace, let's go!"
+        announcements.append({'time': warmup, 'text': go_text})
+        all_texts.add(go_text)
+
+    # 2. Distance announcements during workout
+    announce_every = config['announce_every']
+    seconds_per_meter = config['seconds_per_meter']
+    total_distance = config['total_distance']
+
+    distance = announce_every
+    while distance <= total_distance:
+        # Time when user should reach this distance
+        time_at_distance = distance * seconds_per_meter + warmup
+
+        # Only add if within total duration
+        if time_at_distance < config['total_duration']:
+            if language == 'zh':
+                text = f"{distance}米"
+            else:
+                text = f"{distance} meters"
+
             announcements.append({
-                'time': actual_time,
+                'time': time_at_distance,
                 'text': text,
-                'distance': 0
+                'distance': distance
             })
-            print(f"    {actual_time:.1f}sec - {text}")
-
-    # 4.2 Calculate swim phase announcements
-    print(f"\n  Swim announcements:")
-    for ann_config in config['voice']['announcements']:
-        interval = ann_config['interval']
-        format_str = ann_config['format']
-
-        ann_list = audio_gen.calculate_announcement_times(
-            pool_length=config['pool']['length'],
-            time_per_100m=config['target']['time_per_100m'],
-            interval=interval,
-            total_duration=swim_duration
-        )
-
-        for ann in ann_list:
-            text = format_str.format(
-                distance=ann['distance'],
-                laps=int(ann['laps']),
-                hundreds=ann['hundreds']
-            )
             all_texts.add(text)
-            ann['text'] = text
-            ann['time'] += warmup_time
-            announcements.append(ann)
+
+        distance += announce_every
 
     # Sort by time
     announcements.sort(key=lambda x: x['time'])
 
-    print(f"\n  ✓ Calculated {len(announcements)} announcement times")
-    print(f"  ✓ Need to generate {len(all_texts)} different voice files")
+    return announcements, list(all_texts)
+
+
+def main():
+    """Main program"""
+    print("=" * 60)
+    print("Workout Pacer Generator")
+    print("=" * 60)
+
+    # 1. Load config
+    print("\n[1/6] Loading configuration...")
+    config = load_config()
+    config = process_config(config)
+
+    target_time = config['target_time']
+    per_meters = config['per_meters']
+    total_distance = config['total_distance']
+    announce_every = config['announce_every']
+    warmup = config['warmup_seconds']
+    workout_duration = config['workout_duration']
+    total_duration = config['total_duration']
+
+    print(f"  ✓ Configuration loaded")
+    print(f"    - Target: {target_time} per {per_meters}m")
+    print(f"    - Total distance: {total_distance}m")
+    print(f"    - Announce every: {announce_every}m")
+    print(f"    - Warmup: {warmup}sec")
+    print(f"    - Workout duration: {workout_duration//60}min {workout_duration%60}sec")
+    print(f"    - Total duration: {total_duration//60}min {total_duration%60}sec")
+
+    # 2. Initialize audio generator
+    print("\n[2/6] Initializing audio generator...")
+    audio_gen = AudioGenerator(sample_rate=config['output']['sample_rate'])
+    print("  ✓ Audio generator initialized")
+
+    # 3. Generate base audio (metronome or silence)
+    print("\n[3/6] Generating base audio...")
+    if config['metronome']['enabled']:
+        print(f"    - Metronome: {config['metronome']['bpm']} BPM")
+        base_audio = audio_gen.generate_metronome(
+            bpm=config['metronome']['bpm'],
+            beats_per_measure=config['metronome']['beats_per_measure'],
+            duration_seconds=total_duration,
+            click_frequency=config['metronome']['click_frequency'],
+            accent_frequency=config['metronome']['accent_frequency'],
+            click_duration=config['metronome']['click_duration'],
+            volume=config['metronome']['volume'],
+            accent_first=True
+        )
+        print("  ✓ Metronome generated")
+    else:
+        base_audio = AudioSegment.silent(duration=total_duration * 1000)
+        print("  ✓ Silent base track created (metronome disabled)")
+
+    # 4. Calculate announcements
+    print("\n[4/6] Calculating announcements...")
+    announcements, all_texts = calculate_announcements(config)
+    print(f"  ✓ {len(announcements)} announcements calculated")
+    print(f"  ✓ {len(all_texts)} unique voice files needed")
+
     print(f"\n  First 10 announcements:")
     for ann in announcements[:10]:
-        print(f"    {ann['time']:.2f}sec - {ann['text']}")
+        print(f"    {ann['time']:.1f}sec - {ann['text']}")
 
-    # 5. Generate voice files (if enabled)
-    voice_files_map = {}
-    if config['voice']['enabled']:
-        print("\n[5/7] Generating voice files...")
-        provider = config['voice'].get('tts_provider', 'edge')
-        print(f"    - TTS Provider: {provider}")
+    # 5. Generate voice files
+    print("\n[5/6] Generating voice files...")
+    try:
+        tts = get_tts_from_config(config)
+        voice_dir = Path("output/voices")
+        voice_dir.mkdir(parents=True, exist_ok=True)
 
-        try:
-            tts = get_tts_from_config(config)
-            voice_dir = Path("output/voices")
-            voice_dir.mkdir(parents=True, exist_ok=True)
+        # Sort texts for consistent output
+        def sort_key(text):
+            import re
+            nums = re.findall(r'\d+', text)
+            if nums:
+                return (0, int(nums[0]))
+            return (1, text)
 
-            # Sort texts for consistent output
-            def sort_key(text):
-                import re
-                nums = re.findall(r'\d+', text)
-                if nums:
-                    return (0, int(nums[0]))
-                else:
-                    return (1, text)
+        sorted_texts = sorted(all_texts, key=sort_key)
+        print(f"    Generating {len(sorted_texts)} voice files...")
 
-            all_texts_list = sorted(list(all_texts), key=sort_key)
-
-            print(f"    Generating {len(all_texts_list)} voice files...")
-
-            voice_files_map = tts.generate_multiple_speeches(
-                texts=all_texts_list,
-                output_dir=voice_dir,
-                max_workers=10
-            )
-
-            print(f"  ✓ All voice files generated")
-
-        except Exception as e:
-            print(f"  ✗ Voice generation failed: {str(e)}")
-            if provider == 'openai':
-                print("  Tip: Check OPENAI_API_KEY or switch to 'edge' provider (free)")
-            return
-
-    else:
-        print("\n[5/7] Voice announcements disabled")
-
-    # 6. Mix audio
-    print("\n[6/7] Mixing audio...")
-    if config['voice']['enabled'] and voice_files_map:
-        final_audio = audio_gen.mix_audio_with_voice(
-            base_audio=base_audio,
-            voice_files_map=voice_files_map,
-            announcements=announcements,
-            voice_volume=config['voice']['volume']
+        voice_files_map = tts.generate_multiple_speeches(
+            texts=sorted_texts,
+            output_dir=voice_dir,
+            max_workers=10
         )
-    else:
-        final_audio = base_audio
+        print(f"  ✓ All voice files generated")
 
-    print("  ✓ Audio mixing complete")
+    except Exception as e:
+        print(f"  ✗ Voice generation failed: {str(e)}")
+        return
 
-    # 7. Export final file
-    output_path = Path("output") / config['audio']['output_filename']
-    print(f"\n[7/7] Exporting audio to: {output_path}")
-    audio_gen.export_audio(final_audio, output_path, format=config['audio']['format'])
+    # 6. Mix and export
+    print("\n[6/6] Mixing and exporting...")
+    final_audio = audio_gen.mix_audio_with_voice(
+        base_audio=base_audio,
+        voice_files_map=voice_files_map,
+        announcements=announcements,
+        voice_volume=config['voice']['volume']
+    )
+
+    output_path = Path("output") / config['output']['filename']
+    audio_gen.export_audio(final_audio, output_path, format=config['output']['format'])
 
     file_size_mb = output_path.stat().st_size / (1024 * 1024)
     print(f"  ✓ Export successful!")
-    print(f"    - File size: {file_size_mb:.2f} MB")
-    if warmup_time > 0:
-        print(f"    - Total duration: {duration}sec ({duration//60}min {duration%60}sec)")
-        print(f"      · Warmup: 0-{warmup_time}sec (countdown)")
-        print(f"      · Swim: {warmup_time}-{duration}sec")
-    else:
-        print(f"    - Duration: {duration}sec ({duration//60}min {duration%60}sec)")
+    print(f"    - File: {output_path}")
+    print(f"    - Size: {file_size_mb:.2f} MB")
 
     print("\n" + "=" * 60)
-    print("Generation complete!")
+    print("Done!")
     print("=" * 60)
-    if warmup_time > 0:
-        print("Usage:")
-        print(f"  1. Play audio, first {warmup_time}sec is warmup countdown")
-        print(f"  2. Start swimming when you hear \"Go!\"")
-        print(f"  3. Follow the metronome to maintain pace")
-        print(f"  4. Listen for voice announcements for distance")
-    print("\nTransfer the file to your waterproof earbuds.")
+    print(f"\nUsage:")
+    print(f"  1. Transfer '{output_path.name}' to your device/earbuds")
+    print(f"  2. Press play, wait for countdown")
+    print(f"  3. Start when you hear 'Go!'")
+    print(f"  4. Listen for distance announcements to check your pace")
     print("=" * 60)
 
 

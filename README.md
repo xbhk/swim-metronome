@@ -1,277 +1,174 @@
-# 游泳节拍器生成器 🏊‍♂️
+# Workout Pacer 运动配速器
 
-为游泳训练生成定制化的节拍器音频，带有精确的时间和距离语音提示。
+Generate audio with voice announcements to help you maintain a steady pace during swimming, running, or any sport.
 
-## 功能特性
+生成带语音播报的音频，帮助你在游泳、跑步或其他运动中保持稳定配速。
 
-- ✅ **可配置的节拍器**：自定义 BPM、拍数和重音模式
-- ✅ **智能语音提示**：在精确的时间点提示游泳距离
-- ✅ **自动计算**：根据目标配速自动计算所有提示时间点
-- ✅ **高质量 TTS**：使用 OpenAI TTS 生成自然的语音
-- ✅ **灵活配置**：通过 YAML 配置文件轻松调整所有参数
-- ✅ **支持自定义 API**：可配置自定义的 OpenAI API Base URL
+## Quick Start 快速开始
 
-## 快速开始
-
-### 1. 安装依赖
+### 1. Install 安装
 
 ```bash
-# 安装 Python 依赖
+# Install Python dependencies
 pip install -r requirements.txt
 
-# 安装 ffmpeg（pydub 需要）
+# Install ffmpeg (required by pydub)
 # macOS:
 brew install ffmpeg
 
 # Ubuntu/Debian:
 sudo apt-get install ffmpeg
-
-# Windows:
-# 下载 ffmpeg 并添加到 PATH
 ```
 
-### 2. 配置 API
+### 2. Configure 配置
 
-复制 `.env.example` 到 `.env` 并填入你的配置：
+Edit `config.yaml` - only 4 settings needed:
 
-```bash
-cp .env.example .env
-```
-
-编辑 `.env` 文件：
-
-```env
-OPENAI_API_KEY=your-api-key-here
-# 如果使用自定义 API Base URL：
-OPENAI_BASE_URL=https://your-custom-api.com/v1
-```
-
-或者直接在环境变量中设置：
-
-```bash
-export OPENAI_API_KEY="your-api-key"
-export OPENAI_BASE_URL="https://your-custom-api.com/v1"  # 可选
-```
-
-### 3. 配置参数
-
-编辑 `config.yaml` 文件，根据你的需求调整参数：
+编辑 `config.yaml` - 只需要填写 4 个设置：
 
 ```yaml
-pool:
-  length: 25  # 泳池长度
+# 配速设置：你的目标配速是多少？
+target_time: "2:00"      # 2分钟
+per_meters: 100          # 跑100米
 
-target:
-  time_per_100m: 105  # 目标配速（秒）
+# 音频设置：这段音频能陪你跑多远？
+total_distance: 1000     # 米
 
-audio:
-  duration: 3600  # 音频总时长（秒）
-
-metronome:
-  enabled: true
-  bpm: 41
-  beats_per_measure: 6
-
-voice:
-  enabled: true
-  voice_model: "nova"  # 声音选择
+# 每跑多少米报一次时？（填25 → 会在25m, 50m, 75m...处报时）
+announce_every: 25
 ```
 
-### 4. 生成音频
+### 3. Generate 生成
 
 ```bash
 python generate.py
 ```
 
-生成的音频文件将保存在 `output/` 目录下。
+Output file: `output/workout_pacer.mp3`
 
-## 配置说明
+### 4. Use 使用
 
-### 泳池设置 (pool)
+1. Transfer the audio file to your device/waterproof earbuds
+2. Press play, wait for countdown
+3. Start when you hear "Go!"
+4. Listen for distance announcements to check your pace
 
-- `length`: 泳池长度（米）
-- `actual_length`: 实际长度（如果与标准不同）
+---
 
-### 目标配置 (target)
+1. 把音频文件传到手机或防水耳机
+2. 按播放，等待倒计时
+3. 听到"开始"后开始运动
+4. 听语音播报来检查配速
 
-- `time_per_100m`: 每 100 米的目标时间（秒）
-  - 例如：105 = 1分45秒/100米
+## Examples 示例
 
-### 音频设置 (audio)
+### Swimming 游泳
 
-- `duration`: 总时长（秒）
-- `format`: 输出格式（mp3 或 wav）
-- `sample_rate`: 采样率（默认 44100）
-- `output_filename`: 输出文件名
-
-### 节拍器设置 (metronome)
-
-- `enabled`: 是否启用节拍器
-- `bpm`: 每分钟节拍数
-- `beats_per_measure`: 每小节拍数
-- `accent_first`: 第一拍是否为重音
-- `volume`: 音量（0-1）
-- `click_frequency`: 普通拍频率（Hz）
-- `accent_frequency`: 重音拍频率（Hz）
-
-### 语音设置 (voice)
-
-- `enabled`: 是否启用语音提示
-- `language`: 语言（zh-CN 或 en-US）
-- `volume`: 语音音量（0-1）
-- `voice_model`: OpenAI TTS 声音模型
-  - 可选：alloy, echo, fable, onyx, nova, shimmer
-
-#### 提示配置 (announcements)
-
-可以配置多个提示规则：
+25米泳池，2分钟游100米，游1000米：
 
 ```yaml
-announcements:
-  - interval: 25  # 每 25 米
-    format: "{distance}米"
-
-  - interval: 100  # 每 100 米额外提示
-    format: "完成 {hundreds} 个100米"
+target_time: "2:00"
+per_meters: 100
+total_distance: 1000
+announce_every: 25
 ```
 
-支持的占位符：
-- `{distance}`: 当前距离
-- `{laps}`: 圈数
-- `{hundreds}`: 100米的倍数
+### Running 跑步
 
-## 测试
+6分钟跑1公里，跑5公里：
 
-### 测试 TTS 服务
-
-```bash
-python tts_service.py
+```yaml
+target_time: "6:00"
+per_meters: 1000
+total_distance: 5000
+announce_every: 500
 ```
 
-这将生成一个测试语音文件在 `output/test_voice.mp3`。
+## Optional Settings 可选设置
 
-### 测试音频生成器
+### Warmup Countdown 准备倒计时
 
-```bash
-python audio_generator.py
+```yaml
+warmup_seconds: 15       # 默认 15 秒（包含语音提示 + 10秒倒数）
 ```
 
-这将生成一个 10 秒的测试节拍器在 `output/test_metronome.mp3`。
+### Metronome 节拍器
 
-## 使用场景
+Help maintain stroke/step rhythm:
 
-### 场景 1：保持匀速游泳
-
-配置：
-- BPM 41，每 6 拍 1 重音
-- 每 25 米语音提示
-- 目标配速 1分45秒/100米
+帮助保持划水/步频节奏：
 
 ```yaml
 metronome:
-  enabled: true
-  bpm: 41
-  beats_per_measure: 6
-
-voice:
-  announcements:
-    - interval: 25
-      format: "{distance}米"
+  enabled: true          # 启用节拍器
+  bpm: 55                # 每分钟节拍数
 ```
 
-### 场景 2：只用语音提示（无节拍器）
-
-配置：
-```yaml
-metronome:
-  enabled: false
-
-voice:
-  enabled: true
-  announcements:
-    - interval: 50
-      format: "{distance}米"
-```
-
-### 场景 3：长距离训练
-
-配置 1 小时音频，每 100 米提示：
+### Voice Language 语音语言
 
 ```yaml
-audio:
-  duration: 3600  # 1小时
-
 voice:
-  announcements:
-    - interval: 100
-      format: "{hundreds}个100"
+  language: "zh"         # "zh" 中文 / "en" 英文
 ```
 
-## 项目结构
+### TTS Engine 语音引擎
 
-```
-swim-metronome/
-├── config.yaml           # 主配置文件
-├── generate.py          # 主程序
-├── tts_service.py       # TTS 服务模块
-├── audio_generator.py   # 音频生成模块
-├── requirements.txt     # Python 依赖
-├── .env.example        # 环境变量示例
-├── README.md           # 说明文档
-└── output/            # 输出目录
-    ├── voices/        # 生成的语音文件
-    └── *.mp3         # 最终音频文件
+```yaml
+tts:
+  provider: "edge"       # "edge"（免费）或 "openai"（付费）
 ```
 
-## 常见问题
+## How It Works 工作原理
 
-### 1. TTS 生成失败
+The pacer calculates when you should reach each distance checkpoint based on your target pace, then announces it at exactly that time.
 
-**问题**：提示 "生成语音失败" 或 API 错误
+配速器根据你的目标配速计算你应该在什么时间到达每个距离点，然后在那个时间播报。
 
-**解决方案**：
-- 检查 `OPENAI_API_KEY` 是否正确设置
-- 如果使用自定义 Base URL，确认 `OPENAI_BASE_URL` 配置正确
-- 运行 `python tts_service.py` 测试 TTS 服务
+**Example 示例:**
 
-### 2. ffmpeg 未找到
+- Target: 2:00 per 100m (2分钟100米)
+- At 30 sec → "25 meters" (30秒时播报"25米")
+- At 60 sec → "50 meters"
+- At 90 sec → "75 meters"
+- At 120 sec → "100 meters"
 
-**问题**：提示 "ffmpeg not found"
+If you hear "50 meters" and you're:
+- At 50m → Perfect pace! 配速正确
+- Past 50m → Too fast, slow down 太快了
+- Before 50m → Too slow, speed up 太慢了
 
-**解决方案**：
-- macOS: `brew install ffmpeg`
-- Ubuntu: `sudo apt-get install ffmpeg`
-- Windows: 下载 ffmpeg 并添加到系统 PATH
+## Features 功能
 
-### 3. 音频文件太大
+- Free TTS (Edge TTS) - works in China, no API key needed
+- Optional premium TTS (OpenAI)
+- Optional metronome for rhythm
+- Chinese and English voice support
+- Simple 4-parameter configuration
 
-**问题**：生成的 MP3 文件很大
+## Project Structure 项目结构
 
-**解决方案**：
-- 减少 `audio.duration`（总时长）
-- 降低 `metronome.volume`（节拍器音量会影响文件大小）
-- 使用 `format: "mp3"` 而不是 `wav`（MP3 更小）
+```
+workout-pacer/
+├── config.yaml          # Configuration 配置文件
+├── generate.py          # Main program 主程序
+├── tts_service.py       # TTS service 语音服务
+├── audio_generator.py   # Audio generation 音频生成
+├── requirements.txt     # Dependencies 依赖
+└── output/              # Output directory 输出目录
+```
 
-### 4. 语音提示不准确
+## Requirements 依赖
 
-**问题**：语音提示时间与实际游泳不匹配
-
-**解决方案**：
-- 调整 `target.time_per_100m` 以匹配你的实际配速
-- 如果泳池实际长度不是标准 25 米，在 `pool.actual_length` 中设置实际长度
-
-## 技术栈
-
-- **Python 3.7+**
-- **pydub**: 音频处理和混合
-- **OpenAI API**: 高质量 TTS
-- **PyYAML**: 配置文件解析
-- **NumPy**: 数值计算
+- Python 3.7+
+- ffmpeg
+- pydub, edge-tts, PyYAML, numpy
 
 ## License
 
 MIT
 
-## 贡献
+## Contributing 贡献
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests welcome!
+
+欢迎提交 Issue 和 PR！

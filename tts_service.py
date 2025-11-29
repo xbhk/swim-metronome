@@ -76,7 +76,7 @@ class EdgeTTSService(BaseTTSService):
     # Default voices
     DEFAULT_VOICES = {
         "en": "en-US-AriaNeural",
-        "zh": "zh-CN-XiaozhenNeural",
+        "zh": "zh-CN-XiaoyuMultilingualNeural",
     }
 
     def __init__(self, voice=None, rate="+0%"):
