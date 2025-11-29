@@ -1,0 +1,12 @@
+# Audio processing
+pydub>=0.25.1
+
+# TTS services
+edge-tts>=6.1.0  # Free, default
+openai>=1.0.0    # Premium, optional
+
+# Configuration
+PyYAML>=6.0
+
+# Numerical computing
+numpy>=1.24.0

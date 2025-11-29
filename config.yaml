@@ -1,0 +1,89 @@
+# Swim Metronome Configuration
+
+# Pool settings
+pool:
+  length: 25  # Pool length (meters)
+  actual_length: 23  # Actual length (if different from standard)
+
+# Target configuration
+target:
+  # Pace setting
+  pace: "2:45"  # 2min 45sec per 100m - aerobic pace (~27min 30sec for 1000m)
+  # time_per_100m: 165  # Or use seconds directly
+
+  # Target distance (meters) - audio duration calculated automatically
+  distance: 2000
+
+# Audio output settings
+audio:
+  # Warmup phase
+  warmup_time: 60  # Warmup time (seconds)
+  warmup_announcements:
+    - time: 60
+      text: "Ready in 1 minute"
+    - time: 30
+      text: "30 seconds"
+    - time: 10
+      text: "10"
+    - time: 9
+      text: "9"
+    - time: 8
+      text: "8"
+    - time: 7
+      text: "7"
+    - time: 6
+      text: "6"
+    - time: 5
+      text: "5"
+    - time: 4
+      text: "4"
+    - time: 3
+      text: "3"
+    - time: 2
+      text: "2"
+    - time: 1
+      text: "1"
+    - time: 0
+      text: "Go!"
+
+  buffer_time: 60  # Buffer time after swimming (seconds)
+  format: "mp3"
+  sample_rate: 44100
+  output_filename: "swim_metronome.mp3"
+
+# Metronome settings
+metronome:
+  enabled: true
+  bpm: 36  # Beats per minute
+  beats_per_measure: 6
+  accent_first: true
+  volume: 1.0
+  click_frequency: 800  # Normal beat frequency (Hz)
+  accent_frequency: 1200  # Accent beat frequency (Hz)
+  click_duration: 0.05
+
+# Voice settings
+voice:
+  enabled: true
+  volume: 1.0
+
+  # TTS Provider: "edge" (free, recommended) or "openai" (premium, paid)
+  tts_provider: "edge"
+
+  # Edge TTS settings (default, free, works in China)
+  edge:
+    voice_en: "en-US-AriaNeural"  # English voice
+    voice_zh: "zh-CN-XiaozhenNeural"  # Chinese voice
+    rate: "+0%"  # Speech rate
+
+  # OpenAI TTS settings (optional, requires API key)
+  openai:
+    voice_model: "nova"  # alloy, echo, fable, onyx, nova, shimmer
+    tts_model: "tts-1"  # tts-1 or tts-1-hd
+    api_key: ""  # Your OpenAI API key (or set OPENAI_API_KEY env var)
+    base_url: ""  # Custom API base URL (optional)
+
+  # Distance announcement settings
+  announcements:
+    - interval: 25
+      format: "{distance} meters"
