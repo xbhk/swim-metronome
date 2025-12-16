@@ -7,12 +7,12 @@
 # 你的目标配速是多少？
 # 例：2分钟跑100米 → target_time: "2:00", per_meters: 100
 # 例：6分钟跑1公里 → target_time: "6:00", per_meters: 1000
-target_time: "2:00"
-per_meters: 100
+target_time: "23:00"
+per_meters: 1000
 
 # ===== 音频设置 =====
 # 这段音频能陪你跑多远？
-total_distance: 1000     # 米
+total_distance: 2000     # 米
 
 # 每跑多少米报一次时？
 # 填 25 → 会在 25m, 50m, 75m, 100m... 处报时
@@ -27,7 +27,7 @@ warmup_seconds: 15       # 开始前的倒计时秒数（建议15秒，包含提
 # 节拍器（帮助保持划水/步频节奏，默认启用）
 metronome:
   enabled: true         # 是否启用节拍器（true/false）
-  bpm: 50                # 每分钟节拍数（根据你的划水/步频调整）
+  bpm: 40                # 每分钟节拍数（根据你的划水/步频调整）
 
 # 语音设置
 voice:

@@ -173,9 +173,15 @@ def calculate_announcements(config):
         # Countdown ends at warmup time, so starts at (warmup - 10)
         countdown_duration = min(10, warmup - 3)  # Leave 3 sec for intro
         
+        # Chinese number mapping for TTS (Edge TTS struggles with single digits)
+        chinese_numbers = {
+            1: '一', 2: '二', 3: '三', 4: '四', 5: '五',
+            6: '六', 7: '七', 8: '八', 9: '九', 10: '十'
+        }
+        
         for i in range(countdown_duration, 0, -1):
             actual_time = warmup - i
-            text = str(i)
+            text = chinese_numbers[i] if language == 'zh' else str(i)
             announcements.append({'time': actual_time, 'text': text})
             all_texts.add(text)
 
